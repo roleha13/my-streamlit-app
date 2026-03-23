@@ -92,8 +92,12 @@ def generate_master(files):
         end_row = current_row + n - 1
 
         # Insert a row after the last transaction of this group
-        ws.insert_rows(end_row + 1)
-
+        ws.insert_rows(end_row + 1)                        
+        
+        # 1 Column A (1)
+        ws.cell(row=end_row + 1, column=1, value="1;3;6")
+        # TRANSACTION REFERENCE Column B (2)
+        ws.cell(row=end_row + 1, column=2, value=month_label)
         # DESCRIPTION column C (3)
         ws.cell(row=end_row + 1, column=3, value=f"FOOD INV {date.strftime('%d/%m/%Y')}")
         # ACCOUNT CODE column D (4)
