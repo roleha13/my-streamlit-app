@@ -2,6 +2,8 @@ import pandas as pd
 from datetime import datetime
 from io import BytesIO
 import streamlit as st
+from openpyxl import load_workbook
+from openpyxl.styles import Font
 
 # ================= CORE FUNCTIONS =================
 
@@ -72,12 +74,12 @@ def generate_master(files):
 
     grouped = []
 
-    for date, group in df.groupby("TRANSACTION DATE"):
+    for date, group in df.groupby("TRANSACTION DATE", sort=True):
         total_amt = group["BASE AMOUNT"].sum()
         month_label = format_month_label(date)
         period = corrected_month_to_period(date)
 
-        grouped.append(group)
+        grouped.append(group.sort_values("DESCRIPTION"))
 
         grouped.append(pd.DataFrame([{
             "1": "1;3;6",
@@ -93,35 +95,68 @@ def generate_master(files):
 
     df_final = pd.concat(grouped, ignore_index=True)
 
+    # ================= WRITE + FORMAT EXCEL =================
+
     output = BytesIO()
-    df_final.to_excel(output, index=False)
+
+    # Write initial file
+    df_final.to_excel(output, index=False, engine="openpyxl")
     output.seek(0)
 
-    return output
+    # Load for formatting
+    wb = load_workbook(output)
+    ws = wb.active
+
+    # Format BASE AMOUNT (Column G)
+    for cell in ws["G"][1:]:
+        cell.number_format = '#,##0.00'
+
+    # Format TRANSACTION DATE (Column E)
+    for cell in ws["E"][1:]:
+        cell.number_format = 'dd/mm/yyyy'
+        cell.alignment = cell.alignment.copy(horizontal='right')
+
+    # Bold FOOD INV rows (Column H = DEBIT/CREDIT)
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        if row[7].value == "C":
+            for cell in row:
+                cell.font = Font(bold=True)
+
+    # Save final file
+    final_output = BytesIO()
+    wb.save(final_output)
+    final_output.seek(0)
+
+    return final_output
 
 # ================= STREAMLIT UI =================
 
+st.set_page_config(page_title="GKC Food Invoice Generator", layout="centered")
+
 st.title("📊 GKC Food Invoice Generator (Web Version)")
+st.markdown("Upload your POS Excel files and generate a formatted master file.")
 
 uploaded_files = st.file_uploader(
-    "Upload Excel Files",
+    "📂 Upload Excel Files",
     type=["xlsx", "xls"],
     accept_multiple_files=True
 )
 
-if st.button("Generate Master Excel"):
+if st.button("▶️ Generate Master Excel"):
     if uploaded_files:
-        result = generate_master(uploaded_files)
+        with st.spinner("Processing files..."):
+            result = generate_master(uploaded_files)
 
         if result:
-            st.success("File generated successfully!")
+            st.success("✅ File generated successfully!")
+
             st.download_button(
-                label="Download Excel",
+                label="📥 Download Excel",
                 data=result,
                 file_name="CRJ_ALL_TRANSFORMED.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
-            st.warning("No matching data found.")
+            st.warning("⚠️ No matching data found in uploaded files.")
     else:
-        st.error("Please upload at least one file.")
+        st.error("❌ Please upload at least one Excel file.")
