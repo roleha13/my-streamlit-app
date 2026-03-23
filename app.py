@@ -91,6 +91,8 @@ def generate_master(files):
         start_row = current_row
         end_row = current_row + n - 1
 
+        month_label = format_month_label(date)  # <<< ADD THIS LINE
+        
         # Insert a row after the last transaction of this group
         ws.insert_rows(end_row + 1)                        
         
