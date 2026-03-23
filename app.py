@@ -72,41 +72,51 @@ def generate_master(files):
     df = pd.concat(all_data, ignore_index=True)
     df["TRANSACTION DATE"] = pd.to_datetime(df["TRANSACTION DATE"])
 
-    grouped = []
-
-    for date, group in df.groupby("TRANSACTION DATE", sort=True):
-        total_amt = group["BASE AMOUNT"].sum()
-        month_label = format_month_label(date)
-        period = corrected_month_to_period(date)
-
-        grouped.append(group.sort_values("DESCRIPTION"))
-
-        grouped.append(pd.DataFrame([{
-            "1": "1;3;6",
-            "TRANSACTION REFERENCE": month_label,
-            "DESCRIPTION": f"FOOD INV {date.strftime('%d/%m/%Y')}",
-            "ACCOUNT CODE": "CT00311",
-            "TRANSACTION DATE": date,
-            "PERIOD": period,
-            "BASE AMOUNT": total_amt,
-            "DEBIT/CREDIT": "C",
-            "TRANSACTION CURRENCY": "KSH"
-        }]))
-
-    df_final = pd.concat(grouped, ignore_index=True)
-
-    # ================= WRITE + FORMAT EXCEL =================
-
+    # Sort by date and description
+    df = df.sort_values(["TRANSACTION DATE", "DESCRIPTION"])
+    
+    # Write initial Excel
     output = BytesIO()
-
-    # Write initial file
-    df_final.to_excel(output, index=False, engine="openpyxl")
+    df.to_excel(output, index=False, engine="openpyxl")
     output.seek(0)
 
-    # Load for formatting
     wb = load_workbook(output)
     ws = wb.active
 
+    # ========== Insert FOOD INV formula rows ==========
+    current_row = 2  # Excel row 1 = header
+
+    for date, group in df.groupby("TRANSACTION DATE", sort=True):
+        n = len(group)
+        start_row = current_row
+        end_row = current_row + n - 1
+
+        # Insert a row after the last transaction of this group
+        ws.insert_rows(end_row + 1)
+
+        # DESCRIPTION column C (3)
+        ws.cell(row=end_row + 1, column=3, value=f"FOOD INV {date.strftime('%d/%m/%Y')}")
+        # ACCOUNT CODE column D (4)
+        ws.cell(row=end_row + 1, column=4, value="CT00311")
+        # TRANSACTION DATE column E (5)
+        ws.cell(row=end_row + 1, column=5, value=date)
+        # PERIOD column F (6)
+        ws.cell(row=end_row + 1, column=6, value=corrected_month_to_period(date))
+        # BASE AMOUNT column G (7) — formula
+        ws.cell(row=end_row + 1, column=7, value=f"=SUM(G{start_row}:G{end_row})")
+        # DEBIT/CREDIT column H (8)
+        ws.cell(row=end_row + 1, column=8, value="C")
+        # TRANSACTION CURRENCY column I (9)
+        ws.cell(row=end_row + 1, column=9, value="KSH")
+
+        # Bold FOOD INV row
+        for cell in ws[end_row + 1]:
+            cell.font = Font(bold=True)
+
+        # Update current_row for next group
+        current_row = end_row + 2
+
+    # ========== Format Excel ==========
     # Format BASE AMOUNT (Column G)
     for cell in ws["G"][1:]:
         cell.number_format = '#,##0.00'
@@ -116,13 +126,7 @@ def generate_master(files):
         cell.number_format = 'dd/mm/yyyy'
         cell.alignment = cell.alignment.copy(horizontal='right')
 
-    # Bold FOOD INV rows (Column H = DEBIT/CREDIT)
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        if row[7].value == "C":
-            for cell in row:
-                cell.font = Font(bold=True)
-
-    # Save final file
+    # Save to BytesIO
     final_output = BytesIO()
     wb.save(final_output)
     final_output.seek(0)
@@ -132,9 +136,8 @@ def generate_master(files):
 # ================= STREAMLIT UI =================
 
 st.set_page_config(page_title="GKC Food Invoice Generator", layout="centered")
-
 st.title("📊 GKC Food Invoice Generator (Web Version)")
-st.markdown("Upload your POS Excel files and generate a formatted master file.")
+st.markdown("Upload your POS Excel files and generate a formatted master file with live SUM formulas.")
 
 uploaded_files = st.file_uploader(
     "📂 Upload Excel Files",
@@ -149,7 +152,6 @@ if st.button("▶️ Generate Master Excel"):
 
         if result:
             st.success("✅ File generated successfully!")
-
             st.download_button(
                 label="📥 Download Excel",
                 data=result,
