@@ -142,8 +142,8 @@ def generate_master(files):
 # ================= STREAMLIT UI =================
 
 st.set_page_config(page_title="GKC Food Invoice Generator", layout="centered")
-st.title("📊 GKC Food Invoice Generator (Web Version)")
-st.markdown("Upload your POS Excel files and generate a formatted master file with live SUM formulas.")
+st.title("📊 GKC POS Data Extraction & Financial Upload Preparation Tool (Web Version)")
+st.markdown("Upload your CRJ Excel files and generate a formatted master file with live SUM formulas.")
 
 uploaded_files = st.file_uploader(
     "📂 Upload Excel Files",
