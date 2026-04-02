@@ -101,7 +101,7 @@ def generate_master(files):
         # TRANSACTION REFERENCE Column B (2)
         ws.cell(row=end_row + 1, column=2, value=month_label)
         # DESCRIPTION column C (3)
-        ws.cell(row=end_row + 1, column=3, value=f"FOOD INV {date.strftime('%d/%m/%Y')}")
+        ws.cell(row=end_row + 1, column=3, value=f"FOOD INV {date.strftime('%d.%m.%Y')}")
         # ACCOUNT CODE column D (4)
         ws.cell(row=end_row + 1, column=4, value="CT00311")
         # TRANSACTION DATE column E (5)
